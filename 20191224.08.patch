@@ -1,0 +1,1207 @@
+Index: src/assets/css/common.css
+===================================================================
+--- src/assets/css/common.css	(revision 38454)
++++ src/assets/css/common.css	(working copy)
+@@ -41,16 +41,4 @@
+ ::-webkit-scrollbar-thumb:hover { /* 鼠标移入滑块 */
+   background: #ccc;
+ }
+-.isHide{
+-  display: none;
+-}
+-.right{float: right}
+ 
+-/*elementUI*/
+-/*设置表单输入框 宽度*/
+-.el-form .limit-with.el-input,
+-.el-form .limit-with.el-select,
+-.el-form .limit-with.el-date-editor,
+-.el-form .limit-with.el-textarea__inner{max-width: 260px;}
+-/*详情右上角编辑图标*/
+-.el-icon-edit{font-size: 26px}
+Index: src/components/Footer.vue
+===================================================================
+--- src/components/Footer.vue	(revision 38454)
++++ src/components/Footer.vue	(working copy)
+@@ -8,16 +8,6 @@
+         {{item.title}}
+       </span>
+     </div>
+-    <div class="copyright">
+-      <div class="item-list">
+-        <router-link
+-          v-for="item in copyrightData"
+-          :key="item.id"
+-          :to="item.src">
+-          {{item.title}}
+-        </router-link>
+-      </div>
+-    </div>
+   </div>
+ </template>
+ 
+@@ -32,14 +22,6 @@
+         {id: 3, title: "联系我们", name: "aboutus"},
+         {id: 4, title: "纠纷处理制度", name: "rulesData"},
+         {id: 5, title: "投诉指引", name: "complaintData"}
+-      ],
+-      copyrightData: [
+-        {id: 1, title: "京ICP备11017824号-4", src: ""},
+-        {id: 2, title: "京ICP证130164号", src: ""},
+-        {id: 3, title: "京公网安备11010502000501号", src: ""},
+-        {id: 4, title: "广播电视节目制作经营许可证（京）字第06990号", src: ""},
+-        {id: 5, title: "联系电话：010-65288428", src: ""},
+-        {id: 6, title: "Copyright © 2006-2019 ZCOOL极客动漫网", src: ""},
+       ]
+     }
+   },
+@@ -60,9 +42,8 @@
+   &:hover
+     color: #999
+ 
+-
+ .content
+-  height: 100px
++  height: 40px
+   margin: 0 auto
+   width: 100%
+   background: #282828
+Index: src/components/Header.vue
+===================================================================
+--- src/components/Header.vue	(revision 38454)
++++ src/components/Header.vue	(working copy)
+@@ -101,7 +101,10 @@
+ 
+ .el-header
+   box-shadow: 0 0px 6px rgba(0,0,0,0.4);
++  width: 100%
+ 
++.el-dropdown-link
++  line-height: 60px
+ 
+ .header_wrap
+   display: flex
+Index: src/request/api.js
+===================================================================
+--- src/request/api.js	(revision 38454)
++++ src/request/api.js	(working copy)
+@@ -10,7 +10,14 @@
+ export const getCartoonList = (search) => fetch('/manage/cartoon' + search)
+ // 动漫详情
+ export const getCartoonInfo = (id) => fetch('/manage/cartoon/' + id)
+-// 创建订单
+-export const setIntegral = (data) => fetch('/manage/user/setIntegral' + data)
+ // 获取轮播图
+ export const getBannerList = () => fetch('/manage/banner')
++// 获取金币消耗记录
++export const getIntegralList = (search) => fetch('/manage/user/setIntegral' + search)
++// 获取充值记录
++export const getOrderList = (search) => fetch('/manage/order' + search)
++// 积分消耗
++export const setIntegral = (id) => fetch('/manage/user/setIntegral/' + id)
++
++
++
+Index: src/router/index.js
+===================================================================
+--- src/router/index.js	(revision 38454)
++++ src/router/index.js	(working copy)
+@@ -51,6 +51,14 @@
+           title: 'Recharge'
+         }
+       },
++      // 详情页面
++      {
++        path: '/imgDetail/:id',
++        component: () => import('../views/imgDetail.vue'),
++        meta: {
++          title: 'imgDetail'
++        }
++      },
+     ]
+   },
+   // 登录
+Index: src/store/index.js
+===================================================================
+--- src/store/index.js	(revision 38454)
++++ src/store/index.js	(working copy)
+@@ -10,7 +10,7 @@
+     isLogin: false,
+     userid: '',
+     username: '',
+-    menu:'',
++    menu:'/home',
+     integral: '',
+     aboutusItem: ''
+   },
+Index: src/utils/tool.js
+===================================================================
+--- src/utils/tool.js	(revision 38454)
++++ src/utils/tool.js	(working copy)
+@@ -1,5 +1,5 @@
+ export function downFlie(fileName,url) {
+-    var downloadElement = document.createElement('a');
++    let downloadElement = document.createElement('a');
+     let arr = url.split('.')
+     let name = arr[arr.length - 1];
+     downloadElement.style.display = 'none';
+Index: src/views/Home.vue
+===================================================================
+--- src/views/Home.vue	(revision 38454)
++++ src/views/Home.vue	(working copy)
+@@ -2,10 +2,9 @@
+   <div class="content">
+     <el-carousel
+       indicator-position="outside"
+-      arrow="always"
+       height="300px">
+       <el-carousel-item v-for="item in bannerList" :key="item.id">
+-        <el-image :src="item.picture" :alt="item.title"></el-image>
++        <img :src="item.picture" :alt="item.title"></img>
+       </el-carousel-item>
+     </el-carousel>
+     <div class="wrapper">
+@@ -19,11 +18,13 @@
+            <span>{{item.cartoon_info.length}}个表情</span>
+          </div>
+        </div>
+-       <div v-for="child in item.cartoon_info" :key="child.id" class="text item">
+-        <el-image :src="child.picture" :alt="item.title"></el-image>
++       <div v-for="child in item.cartoon_info" :key="child.id">
++          <img :src="child.picture" :alt="child.title" lazy @click="goToDetail(item.id, child)" class="img">
++          </img>
+           <div class="bottom clearfix">
+             <p class="title">{{child.title}}</p>
+-            <el-button class="downLoad" @click="downLoadImg(child)" type="text">下载</el-button>
++            <span><strong>{{child.price}}</strong> 金币</span>
++            <el-button class="downLoad" @click="downLoadImg(child)" type="text">{{child.downLoadText}}</el-button>
+           </div>
+        </div>
+      </el-card>
+@@ -48,6 +49,7 @@
+     }
+   },
+   mounted() {
++    this.$store.commit("menuPath", '/home');
+     this.userInfo();
+     this.getBannerList();
+     this.getDataList();
+@@ -56,6 +58,7 @@
+     userInfo() {
+       this.isLogin = this.$store.state.isLogin
+       this.integral = this.$store.state.integral
++      console.log("this.$store.state:", this.$store.state);
+     },
+     // 获取动漫列表
+     getDataList() {
+@@ -65,6 +68,15 @@
+           console.log("res:", res);
+           this.dataList = res.data;
+           this.pageInfo.count = res.count;
++          this.dataList.forEach(item => {
++            item.cartoon_info.forEach(idx => {
++              if (idx.purchase) {
++                idx.downLoadText = '已下载'
++              } else {
++                idx.downLoadText = '下载'
++              }
++            })
++          })
+         }
+       }).catch(err => {
+         this.$message({message: err.message, type: "error", showClose: true});
+@@ -82,39 +94,59 @@
+     },
+     // 下载图片
+     downLoadImg(img) {
+-      // 先判断是否登录 -> 是否有积分 
++      // 先判断是否登录 -> 是否有金币 
+       // 1. 如果尚未注册跳转到注册页面 
+-      // 2. 如果注册但是账号里面没有积分，跳转到人民币兑换积分的界面
+-      // 3. 如果注册登录且有积分进行下载
++      // 2. 如果注册但是账号里面没有金币，跳转到人民币兑换金币的界面
++      // 3. 如果注册登录且有金币进行下载
+       console.log("img:",img);
+       if (this.beforeDownLoad()) {
+-        // 下载并扣除积分
+-        if (this.integral < img.weight) {
+-          this.$message({ showClose: true, message: "你的账户积分不足,正跳转至充值页面", duration:2000, type: 'warning', onClose: () => {
++        if (img.purchase) {
++          downFlie(img.title, img.picture);
++        } else {
++          this.buyInfo(img);
++        }
++      }
++    },
++    changePage:function(pageInfo) {
++      this.pageInfo = pageInfo;
++      this.getDataList();
++    },
++    buyInfo(img) {
++      this.$confirm(`购买此图片需花费${img.price}金币`, '购买提示', {
++        confirmButtonText: '确定',
++        cancelButtonText: '取消'
++      }).then(() => {
++        // 下载并扣除金币
++        if (this.integral < img.price) {
++          this.$message({ showClose: true, message: "你的账户金币不足,正跳转至充值页面", duration:2000, type: 'warning', onClose: () => {
+             this.$router.push('/recharge');
+           }});
+           return;
+         }
+-        this.integral -= img.weight;
+-        this.setIntegral(img.weight);
++        this.integral -= img.price;
++        this.setIntegral(img.id);
++        console.log("img:", img);
+         this.$store.commit('changeIntegral', this.integral);
+         console.log("this.integral:",this.integral);
+         downFlie(img.title, img.picture);
+-      }
++        this.getDataList();
++      }).catch(() => {
++        this.$message({
++          type: 'info',
++          message: '已取消购买'
++        });
++      });
+     },
+-    changePage:function(pageInfo) {
+-      this.pageInfo = pageInfo;
+-      this.getDataList();
+-    },
+     // 点击现在图片之前进行判断
+     beforeDownLoad() {
+       let flog = false;
++      console.log("this.integral:", this.integral);
+       if (!this.isLogin) {
+         this.$message({ showClose: true, message: "你还未登录,正跳转至登录页面", duration:2000, type: 'warning', onClose: () => {
+           this.$router.push('/login')
+         }});
+       } else if(this.integral*100 <= 0){
+-        this.$message({ showClose: true, message: "你的账户暂无积分,正跳转至充值页面", duration:2000, type: 'warning', onClose: () => {
++        this.$message({ showClose: true, message: "你的账户暂无金币,正跳转至充值页面", duration:2000, type: 'warning', onClose: () => {
+           this.$router.push('/recharge')
+         }});
+       } else {
+@@ -122,9 +154,8 @@
+       }
+       return flog;
+     },
+-    setIntegral(info) {
+-      let data = `?integral=${info}`;
+-      setIntegral(data).then(res=>{
++    setIntegral(id) {
++      setIntegral(id).then(res=>{
+         if(res.code == 1) {
+           this.$message({ showClose: true, message: "下载成功", duration:2000, type: 'success'});
+         }
+@@ -131,6 +162,10 @@
+       }).catch(err => {
+         this.$message({message: err.message, type: "error", showClose: true});
+       })
++    },
++    goToDetail(item, info) {
++      let id =  `${item}?cartoon_info_id=${info.id}`
++      this.$router.push('/imgDetail/'+id)
+     }
+   },
+   components: {
+@@ -158,7 +193,7 @@
+   box-shadow: 0 2px 4px rgba(0,0,0,.2)
+ 
+ 
+-.el-carousel__container .el-image
++.el-carousel__container img
+   height: 300px
+ 
+ .wrapper >>>
+@@ -178,9 +213,9 @@
+       flex-wrap: wrap
+       justify-content: space-between
+ 
+-.wrapper .el-image
+-  width: 145px
+-  height: 145px
++.img
++  width: 220px
++  height: 170px
+   padding: 10px
+   border-radius: 2px
+   &:hover
+@@ -191,11 +226,13 @@
+   color: #666
+   display: flex
+   align-items: center
++  justify-content: flex-end
+   span
+     margin-right: 10px
+-  .downLoad
+-    padding: 3px 0
+ 
++.downLoad
++  margin-left: 10px;
++
+ .hotImg
+   margin: 20px 0 10px 0
+   font-size: 20px
+Index: src/views/Login.vue
+===================================================================
+--- src/views/Login.vue	(revision 38454)
++++ src/views/Login.vue	(working copy)
+@@ -101,7 +101,6 @@
+           login(user).then(res=>{
+             console.log("res:", res);
+             if (res.code === 1) {
+-              this.$message({message: "恭喜你，登录成功", type: "success",showClose: true});
+               const onLine = (res.code === 1) ? true : false;
+               console.log(onLine)
+               this.$store.commit("login",
+@@ -108,16 +107,20 @@
+                 {
+                   userid: res.data.id,
+                   username: res.data.email,
+-                  integral: res.data.integral, // 积分
++                  integral: res.data.integral, // 金币
+                   onLine: onLine
+                 })
+-              this.$router.push("/");
++              this.$message({message: "恭喜你，登录成功", type: "success",showClose: true, onClose: () => {
++                this.$router.push("/");
++              }});
+             }
+           }).catch(err => {
+             this.$message.error(err.message);
++            this.changeCodeImg();
+           })
+         } else {
+           this.$message({message: "请输入正确的信息", type: "error", showClose: true});
++          this.changeCodeImg();
+         }
+       });
+     },
+Index: src/views/Register.vue
+===================================================================
+--- src/views/Register.vue	(revision 38454)
++++ src/views/Register.vue	(working copy)
+@@ -157,7 +157,7 @@
+           register(user).then(res=>{
+             console.log("res:", res)
+             if(res.code == 1) {
+-              this.$message({message: "喜你，注册成功，正跳转至登录页面", type: "success", showClose: true, onClose: () => {
++              this.$message({message: "恭喜你，注册成功，正跳转至登录页面", type: "success", showClose: true, onClose: () => {
+                 this.$router.push('/login')
+               }});
+             }
+Index: src/views/UserCenter.vue
+===================================================================
+--- src/views/UserCenter.vue	(revision 38454)
++++ src/views/UserCenter.vue	(working copy)
+@@ -4,31 +4,45 @@
+       <div slot="header">
+         <span>个人中心</span>
+       </div>
+-      <div class="item-list">
+-        <div class="item">
+-          <div class="item-title">注册邮箱：</div>
+-          <div class="item-info">{{info.email}}</div>
+-        </div>
+-        <div class="item">
+-          <div class="item-title">积分：</div>
+-          <div class="item-info">{{info.integral}}</div>
+-        </div>
+-        <div class="item">
+-          <div class="item-title">身份证：</div>
+-          <div class="item-info">{{info.card}}</div>
+-        </div>
+-      </div>
++      <el-tabs v-model="activeName">
++        <el-tab-pane label="基本信息" name="first">
++          <div class="item">
++            <div class="item-title">注册邮箱：</div>
++            <div class="item-info">{{info.email}}</div>
++          </div>
++          <div class="item">
++            <div class="item-title">金币：</div>
++            <div class="item-info">{{info.integral}}</div>
++            <router-link to="/recharge">
++              <el-button class="gopay" type="text">金币不足? 去充值</el-button>
++            </router-link>
++          </div>
++          <div class="item">
++            <div class="item-title">身份证：</div>
++            <div class="item-info">{{info.card}}</div>
++          </div>
++        </el-tab-pane>
++        <el-tab-pane label="充值记录" name="second">
++          <PayList></PayList>
++        </el-tab-pane>
++        <el-tab-pane label="购买记录" name="third">
++          <OrderList></OrderList>
++        </el-tab-pane>
++      </el-tabs>
+     </el-card>
+   </div>
+ </template>
+ 
+ <script>
++import PayList  from './payList.vue'
++import OrderList  from './orderList.vue'
+ import { getUserInfo } from "../request/api.js";
+ export default {
+   name: "UserCenter",
+   data() {
+     return {
+-      info: {}
++      activeName: 'first',
++      info: {},
+     }
+   },
+   mounted() {
+@@ -44,7 +58,11 @@
+       }).catch(err => {
+         this.$message({ showClose: true,message: err.message,duration:2000,type: "error"})
+       });
+-    }
++    },
++  },
++  components: {
++    PayList,
++    OrderList
+   }
+ };
+ </script>
+@@ -66,4 +84,9 @@
+   margin: 20px
+   font-size: 18px
+   color: #444
++  line-height: 40px;
++  height: 40px;
++
++.gopay
++  margin-left: 20px
+ </style>
+Index: src/views/aboutUs/aboutUs.vue
+===================================================================
+--- src/views/aboutUs/aboutUs.vue	(revision 38454)
++++ src/views/aboutUs/aboutUs.vue	(working copy)
+@@ -315,7 +315,7 @@
+         }
+       ],
+       tabPosition: "left",
+-      activeName: ""
++      activeName: "aboutus"
+     }
+   },
+   computed: {
+@@ -327,6 +327,9 @@
+         this.$store.state.aboutusItem = newValue;
+       }
+     }
++  },
++  mounted() {
++    this.$store.commit("menuPath", '/aboutus');
+   }
+ };
+ </script>
+Index: src/views/comic/comic.vue
+===================================================================
+--- src/views/comic/comic.vue	(revision 38454)
++++ src/views/comic/comic.vue	(working copy)
+@@ -11,10 +11,12 @@
+          </div>
+        </div>
+        <div v-for="child in item.cartoon_info" :key="child.id" class="text item">
+-        <el-image :src="child.picture" :alt="item.title"></el-image>
++        <img :src="child.picture" :alt="item.title" lazy @click="goToDetail(item.id, child)" class="img">
++        </img>
+           <div class="bottom clearfix">
+             <p class="title">{{child.title}}</p>
+-            <el-button class="downLoad" @click="downLoadImg(child)" type="text">下载</el-button>
++            <span><strong>{{child.price}}</strong> 金币</span>
++            <el-button class="downLoad" @click="downLoadImg(child)" type="text">{{child.downLoadText}}</el-button>
+           </div>
+        </div>
+      </el-card>
+@@ -38,6 +40,7 @@
+     }
+   },
+   mounted() {
++    this.$store.commit("menuPath", '/comic');
+     this.userInfo();
+     this.getDataList();
+   },
+@@ -54,6 +57,15 @@
+           console.log("res:", res);
+           this.dataList = res.data;
+           this.pageInfo.count = res.count;
++          this.dataList.forEach(item => {
++            item.cartoon_info.forEach(idx => {
++              if (idx.purchase) {
++                idx.downLoadText = '已下载'
++              } else {
++                idx.downLoadText = '下载'
++              }
++            })
++          })
+         }
+       }).catch(err => {
+         this.$message({message: err.message, type: "error", showClose: true});
+@@ -61,24 +73,19 @@
+     },
+     // 下载图片
+     downLoadImg(img) {
+-      // 先判断是否登录 -> 是否有积分 
++      // 先判断是否登录 -> 是否有金币 
+       // 1. 如果尚未注册跳转到注册页面 
+-      // 2. 如果注册但是账号里面没有积分，跳转到人民币兑换积分的界面
+-      // 3. 如果注册登录且有积分进行下载
++      // 2. 如果注册但是账号里面没有金币，跳转到人民币兑换金币的界面
++      // 3. 如果注册登录且有金币进行下载
+       console.log("img:",img);
++
+       if (this.beforeDownLoad()) {
+-        // 下载并扣除积分
+-        if (this.integral < img.weight) {
+-          this.$message({ showClose: true, message: "你的账户积分不足,正跳转至充值页面", duration:2000, type: 'warning', onClose:() =>{
+-            this.$router.push('/recharge');
+-          }});
+-          return;
++        // 如果已经下载过，可以免费下载
++        if (img.purchase) {
++          downFlie(img.title, img.picture);
++        } else { // 下载并扣除金币
++          this.buyInfo(img);
+         }
+-        this.integral -= img.weight;
+-        this.setIntegral(img.weight);
+-        this.$store.commit('changeIntegral', this.integral);
+-        console.log("this.integral:",this.integral);
+-        downFlie(img.title, img.picture);
+       }
+     },
+     changePage:function(pageInfo) {
+@@ -93,7 +100,7 @@
+           this.$router.push('/login');
+         }});
+       } else if(this.integral*100 <= 0){
+-        this.$message({ showClose: true, message: "你的账户暂无积分,正跳转至充值页面", duration:2000, type: 'warning', onClose: () => {
++        this.$message({ showClose: true, message: "你的账户暂无金币,正跳转至充值页面", duration:2000, type: 'warning', onClose: () => {
+           this.$router.push('/recharge');
+         }});
+       } else {
+@@ -101,9 +108,35 @@
+       }
+       return flog;
+     },
+-    setIntegral(info) {
+-      let data = `?integral=${info}`;
+-      setIntegral(data).then(res=>{
++    buyInfo(img) {
++      this.$confirm(`购买此图片需花费${img.price}金币`, '购买提示', {
++        confirmButtonText: '确定',
++        cancelButtonText: '取消'
++      }).then(() => {
++        // 下载并扣除金币
++        if (this.integral < img.price) {
++          this.$message({ showClose: true, message: "你的账户金币不足,正跳转至充值页面", duration:2000, type: 'warning', onClose: () => {
++            this.$router.push('/recharge');
++          }});
++          return;
++        }
++        this.integral -= img.price;
++        this.setIntegral(img.id);
++        console.log("img:", img);
++        this.$store.commit('changeIntegral', this.integral);
++        console.log("this.integral:",this.integral);
++        downFlie(img.title, img.picture);
++        this.getDataList();
++      }).catch(() => {
++        this.$message({
++          type: 'info',
++          message: '已取消购买'
++        });
++      });
++    },
++    // 消耗积分
++    setIntegral(id) {
++      setIntegral(id).then(res=>{
+         if(res.code == 1) {
+           this.$message({ showClose: true, message: "下载成功", duration:2000, type: 'success'});
+         }
+@@ -110,6 +143,10 @@
+       }).catch(err => {
+         this.$message({message: err.message, type: "error", showClose: true});
+       })
++    },
++    goToDetail(item, info) {
++      let id =  `${item}?cartoon_info_id=${info.id}`
++      this.$router.push('/imgDetail/'+id)
+     }
+   },
+   components: {
+@@ -150,9 +187,9 @@
+       flex-wrap: wrap
+       justify-content: space-between
+ 
+-.el-image
+-  width: 145px
+-  height: 145px
++.img
++  width: 220px
++  height: 170px
+   padding: 10px
+   border-radius: 2px
+   &:hover
+@@ -163,13 +200,13 @@
+   color: #666
+   display: flex
+   align-items: center
++  justify-content: flex-end
+   span
+     margin-right: 10px
+-  .downLoad
+-    padding: 3px 0
+ 
++.downLoad
++  margin-left: 10px;
+ 
+-
+ .bottom
+   display: flex
+   align-items: center
+Index: src/views/imgDetail.vue
+===================================================================
+--- src/views/imgDetail.vue	(revision 0)
++++ src/views/imgDetail.vue	(working copy)
+@@ -0,0 +1,202 @@
++<template>
++  <div class="content">
++    <el-card class="box-card">
++      <div slot="header">
++        <span class="maintitle">{{imgData.title}} - 详情</span>
++      </div>
++      <div class="imgInfo">
++        <img :src="imgData.picture" class="image">
++        <div style="padding: 14px;">
++          <div class="mainInfo">
++            <span>{{imgData.itemTitle}}</span>
++            <span><strong>{{imgData.price}}</strong> 金币</span>
++          </div>
++          <div class="bottom clearfix">
++            <div class="time">{{imgData.create_time}}</div>
++            <el-button type="text" class="button" @click="downLoad(imgData)">{{downLoadText}}</el-button>
++          </div>
++        </div>
++      </div>
++    </el-card>
++  </div>
++</template>
++
++<script>
++import { getCartoonInfo, setIntegral } from "../request/api.js";
++import { downFlie } from "../utils/tool.js";
++export default {
++  name: "imgDetail",
++  data() {
++    return {
++      isLogin: false,
++      imgData: {
++        price: 0,
++        create_time: '',
++        itemTitle: '',
++        title: '',
++        picture: '',
++      },
++      downLoadText: '下载'
++    }
++  },
++  mounted() {
++    let id = this.$route.params.id
++    let cartoon_info_id = this.$route.query.cartoon_info_id
++    let search = `${id}?cartoon_info_id=${cartoon_info_id}`
++    console.log("search:", search);
++    this.getData(search);
++    this.userInfo()
++  },
++  methods: {
++    userInfo() {
++      this.isLogin = this.$store.state.isLogin
++      this.integral = this.$store.state.integral
++    },
++    getData(id) {
++      getCartoonInfo(id).then(res=>{
++        if(res.code == 1){
++          console.log("res:", res);
++          this.imgData = res.data.cartoon_info[0]
++          this.imgData.create_time = res.data.create_time
++          this.imgData.itemTitle = res.data.title
++          if (this.imgData.purchase) {
++            this.downLoadText = '已下载(可免费下载)'
++          }
++          this.imgData.isDownload = false
++        }
++      }).catch(err => {
++        this.$message({ showClose: true,message: err.message,duration:2000,type: "error"})
++      });
++    },
++    downLoad(img) {
++      console.log("img:", img);
++      if (this.beforeDownLoad()) {
++        if (img.purchase) { // 如果已经下载过，直接下载
++          downFlie(this.imgData.title, this.imgData.picture);
++        } else {
++          this.downLoadImg(img);
++        }
++      }
++    },
++    downLoadImg(img) {
++      this.$confirm(`购买此图片需花费${img.price}金币`, '购买提示', {
++        confirmButtonText: '确定',
++        cancelButtonText: '取消'
++      }).then(() => {
++        // 下载并扣除金币
++        if (this.integral < img.price) {
++          this.$message({ showClose: true, message: "你的账户金币不足,正跳转至充值页面", duration:2000, type: 'warning', onClose: () => {
++            this.$router.push('/recharge');
++          }});
++          return;
++        }
++        this.integral -= img.price;
++        this.setIntegral(img.id);
++        console.log("img:", img);
++        this.$store.commit('changeIntegral', this.integral);
++        downFlie(img.title, img.picture);
++        let id = this.$route.params.id
++        let search = `${id}?cartoon_info_id=${img.id}`
++        this.getData(search);
++        return;
++      }).catch(() => {
++        this.$message({
++          type: 'info',
++          message: '已取消购买'
++        });
++      });
++    },
++    // 点击现在图片之前进行判断
++    beforeDownLoad() {
++      let flog = false;
++      if (!this.isLogin) {
++        this.$message({ showClose: true, message: "你还未登录,正跳转至登录页面", duration:2000, type: 'warning', onClose: () => {
++          this.$router.push('/login')
++        }});
++      } else if(this.integral*100 <= 0){
++        this.$message({ showClose: true, message: "你的账户暂无金币,正跳转至充值页面", duration:2000, type: 'warning', onClose: () => {
++          this.$router.push('/recharge')
++        }});
++      } else {
++        flog = true
++      }
++      return flog;
++    },
++    setIntegral(id) {
++      setIntegral(id).then(res=>{
++        if(res.code == 1) {
++          this.$message({ showClose: true, message: "下载成功", duration:2000, type: 'success'});
++        }
++      }).catch(err => {
++        this.$message({message: err.message, type: "error", showClose: true});
++      })
++    }
++  }
++};
++</script>
++
++<style lang="stylus" scoped>
++.content
++  height: 800px
++  padding: 40px 0
++  display: flex;
++  justify-content: center;
++  .el-card
++    width: 800px
++
++.maintitle
++  font-size: 20px;
++  font-weight: 800;
++
++.imgInfo
++  text-align: center;
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++
++.mainInfo
++  display: flex;
++  justify-content: space-between;
++  width: 400px;
++  margin: 10px 0;
++  span:nth-child(1)
++    font-size: 18px
++    
++
++
++.time {
++  font-size: 13px;
++  color: #999;
++  float: left;
++}
++
++.bottom {
++  width: 400px;
++  height: 40px;
++  line-height: 40px
++}
++
++.button {
++  padding: 0;
++  float: right;
++  line-height: 40px
++}
++
++.image {
++  border-radius: 2px;
++  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
++  width: 400px;
++  display: block;
++}
++
++.clearfix:before,
++.clearfix:after {
++    display: table;
++    content: "";
++}
++
++.clearfix:after {
++    clear: both
++}
++
++</style>
+Index: src/views/orderList.vue
+===================================================================
+--- src/views/orderList.vue	(revision 0)
++++ src/views/orderList.vue	(working copy)
+@@ -0,0 +1,53 @@
++<template>
++  <div>
++    <VTable :tableHead="tableHead" :tableData="tableData"></VTable>
++    <v-page :pageInfo="pageInfo" @changePage="changePage"></v-page>
++  </div>
++</template>
++
++<script>
++import VTable from './../components/table.vue';
++import VPage from './../components/Page.vue';
++import { getIntegralList } from "../request/api.js";
++export default {
++  name: "PayList",
++  data() {
++    return {
++      pageInfo:{page:1,limit:10,count:0},
++      tableData: [],
++      tableHead: [
++        { id:1, prop:"id", label:"ID", width:"60"},
++        { id:2, prop:"order_num", label:"订单号", width:"200"},
++        { id:3, prop:"cartoon_info.price", label:"消耗金币", width:"auto"},
++        { id:4, prop:"cartoon_info.title", label:"图片名称", width:"auto"},
++        { id:5, prop:"money", label:"剩余金币", width:"auto", type: "number"},
++        { id:6, prop:"create_time", label:"创建时间", width:"160"},
++      ],
++    }
++  },
++  mounted() {
++    this.getDataList();
++  },
++  methods: {
++    getDataList() {
++      let search = `?p=${this.pageInfo.page}&limit=${this.pageInfo.limit}`
++      getIntegralList(search).then(res=>{
++        if(res.code == 1){
++          this.tableData = res.data
++          this.pageInfo.count = res.count;
++        }
++      }).catch(err => {
++        this.$message({ showClose: true,message: err.message,duration:2000,type: "error"})
++      });
++    },
++    changePage:function(pageInfo){
++      this.pageInfo = pageInfo;
++      this.getDataList();
++    },
++  },
++  components: {
++    VTable,
++    VPage
++  }
++};
++</script>
+Index: src/views/payList.vue
+===================================================================
+--- src/views/payList.vue	(revision 0)
++++ src/views/payList.vue	(working copy)
+@@ -0,0 +1,56 @@
++<template>
++  <div>
++    <VTable :tableHead="tableHead" :tableData="tableData"></VTable>
++    <v-page :pageInfo="pageInfo" @changePage="changePage"></v-page>
++  </div>
++</template>
++
++<script>
++import VTable from './../components/table.vue';
++import VPage from './../components/Page.vue';
++import { getOrderList } from "../request/api.js";
++export default {
++  name: "OrderList",
++  data() {
++    return {
++      pageInfo:{page:1,limit:10,count:0},
++      tableData: [],
++      tableHead: [
++        { id:1, prop:"id", label:"ID", width:"60"},
++        { id:2, prop:"money", label:"充值金额", width:"100"},
++        { id:3, prop:"pay_type_name", label:"支付方式", width:"auto"},
++        { id:4, prop:"front_gold", label:"充值前金币", width:"auto", type: "number"},
++        { id:5, prop:"after_gold", label:"充值后金币", width:"auto", type: "number"},
++        { id:6, prop:"create_time", label:"创建时间", width:"160"},
++      ],
++    }
++  },
++  mounted() {
++    this.getDataList();
++  },
++  methods: {
++    getDataList() {
++      let search = `?p=${this.pageInfo.page}&limit=${this.pageInfo.limit}`
++      getOrderList(search).then(res=>{
++        if(res.code == 1){
++          this.tableData = JSON.parse(JSON.stringify(res.data))
++          this.tableData.forEach(item => {
++            item.pay_type_name = ['', '支付宝', '微信'][item.pay_type]
++          })
++          this.pageInfo.count = res.count;
++        }
++      }).catch(err => {
++        this.$message({ showClose: true,message: err.message,duration:2000,type: "error"})
++      });
++    },
++    changePage:function(pageInfo){
++      this.pageInfo = pageInfo;
++      this.getDataList();
++    },
++  },
++  components: {
++    VTable,
++    VPage
++  }
++};
++</script>
+Index: src/views/recharge.vue
+===================================================================
+--- src/views/recharge.vue	(revision 38454)
++++ src/views/recharge.vue	(working copy)
+@@ -1,15 +1,48 @@
+ <template>
+   <div class="content">
+-    <div class="recharge-wrap">
++    <el-card class="box-card" >
++      <div slot="header" class="clearfix">
++        <h3>充值</h3>
++      </div>
++      <div class="subTitle">
++        <div class="subinfo">账户余额</div>
++        <div class="submoney"><strong>{{nowMoney}}</strong> 金币</div>
++      </div>
++      <div class="rechargeWrap">
++        <div class="rulesInfo">
++          <span>1元人民币 = 100金币</span>
++        </div>
++        <div class="paymoneyItems">
++          <div class="item" :class="{'active': select == item.value}" v-for="item in money" @click="selectPayMoney(item)" ref="item">
++            <span class="name">{{item.name}}金币</span>
++            <span>{{item.title}}</span>
++          </div>
++        </div>
++      </div>
++      <div class="payStyle">
++        <div class="rulesInfo"><span>选择支付方式</span></div>
++        <div class="payList">
++          <div class="payItem">
++            <img src="../assets/weixin.jpg" alt="微信支付">
++            <div class="desc">微信支付</div>
++            <el-radio v-model="payType" label="1">微信支付</el-radio>
++          </div>
++          <div class="payItem">
++            <img src="../assets/zhifubao.jpg" alt="支付宝支付">
++            <div class="desc">支付宝支付</div>
++            <el-radio v-model="payType" label="2">支付宝支付</el-radio>
++          </div>
++        </div>
++      </div>
++      <el-button @click="payMoney">立即充值</el-button>
++    </el-card>
++
++    <div class="recharge-wrap" v-if="payImg">
+       <div class="img-content">
+         <div class="item">
+-          <div class="item-title">支付宝支付</div>
+-          <img src="../assets/pay.jpg" alt="">
++          <img src="../assets/pay.jpg" alt="微信支付" v-if="payType == 1">
++          <img src="../assets/zfb.jpg" alt="支付宝支付" v-else>
+         </div>
+-        <div class="item">
+-          <div class="item-title">微信支付</div>
+-          <img src="../assets/pay.jpg" alt="">
+-        </div>
+       </div>
+       <div class="tips">
+         支付成功之后请截图联系客服人员
+@@ -24,8 +57,34 @@
+   name: "Recharge",
+   data() {
+     return {
+-
++      payType: "1",
++      select: "1",
++      payImg: false,
++      money: [
++        {id: 1, name: 100, title: '需支付1元', value: 1},
++        {id: 2, name: 500, title: '需支付5元', value: 5},
++        {id: 3, name: 1000, title: '需支付10元', value: 10},
++        {id: 4, name: 5000, title: '需支付50元', value: 50},
++        {id: 5, name: 10000, title: '需支付100元', value: 100}
++      ]
+     }
++  },
++  computed: {
++    nowMoney() {
++      return this.$store.state.integral
++    }
++  },
++  methods: {
++    selectPayMoney(item) {
++      console.log("item:", item);
++      this.select = item.value
++    },
++    payMoney() {
++      let data = {}
++      data.pay_type = this.payType
++      data.type = this.select
++      this.payImg = !this.payImg
++    }
+   }
+ };
+ </script>
+@@ -32,24 +91,98 @@
+ 
+ <style lang="stylus" scoped>
+ .content
+-  min-height: 900px
+-  .recharge-wrap
+-    margin: 20px
+-    .img-content
+-      display: flex;
+-      justify-content: space-around
+-      .item
+-        .item-title
+-          margin: 10px 0
+-          font-size: 20px
+-          font-weight: 800
++  display: flex;
++  justify-content: center;
++  margin: 40px 0;
++  min-height: 800px
+ 
+-img
+-  width: 300px
++
++.box-card
++  width: 800px
++  .clearfix
++    h3
++      font-size: 24px
++
++.subTitle
++  display: flex;
++  justify-content: space-between;
++  font-size: 20px;
++  color: #666;
++  line-height: 24px;
++  border-bottom: 1px solid #eee;
++  padding-bottom: 10px;
++
++.rulesInfo
++  width: 100%;
++  height: 40px;
++  background: #eee;
++  span
++    font-size: 18px
++    color: #888;
++    line-height: 40px;
++    float: left;
++
++.paymoneyItems
++  display: flex;
++  flex-wrap: wrap;
++  justify-content: space-between;
++  margin: 20px 10px;
++  .item
++    width: 100px
++    height: 80px
++    background: #f7f6f9
++    color: #aaa
++    display: flex;
++    flex-direction: column;
++    margin-bottom: 10px
++    border-radius: 4px
++    cursor: pointer
++    .name
++      font-size: 18px;
++      font-weight: 800;
++      padding: 14px 0;
++
++.paymoneyItems .active
++  color: #fff;
++  background: #02c294;
++  box-shadow: 0 2px 3px #019c77
++
++.payList
++  display: flex;
++  flex-direction: column;
++  margin:  30px 0
++  .payItem
++    display: flex;
++    align-items: center;
++    justify-content: space-evenly;
++    line-height: 40px;
++    margin: 10px 0;
++    img
++      width: 40px
++      height: 40px
++      box-shadow: none
++    .desc
++      font-size: 18px
++      color: #444
++
++
++
++
++.recharge-wrap
++  position: absolute;
++  background: #fff;
++  z-index: 999;
++  padding-top: 20px;
++  margin-top: 20px;
++  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
++
++
++.recharge-wrap img
++  width: 240px
+   border-radius: 4px;
+-  box-shadow: 0 2px 4px rgba(0,0,0,0.2)
+ 
+ .tips
+   margin: 20px
+   font-size: 18px
++  color: #666
+ </style>
